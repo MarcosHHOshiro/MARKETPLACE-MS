@@ -7,12 +7,46 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+        },
+      },
+      crossOriginEmbedderPolicy: false, // Desabilita COEP para evitar bloqueios de recursos de terceiros
+      hsts: {
+        maxAge: 31536000, // 1 ano
+        includeSubDomains: true,
+        preload: true,
+      },
+    }),
+  );
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*', // Permitir todas as origens (ajuste conforme necessário)
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Métodos HTTP permitidos
-    allowedHeaders: 'Content-Type, Authorization', // Cabeçalhos permitidos
+    origin: (origin, callback) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+      if (!origin) return callback(null, true); // Permitir requisições sem origem (como Postman)
+
+      const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || ['*'];
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        callback(null, true);
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: 'GET,PUT,PATCH,POST,DELETE', // Métodos HTTP permitidos
+    allowedHeaders:
+      'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Headers, Access-Control-Request-Method', // Cabeçalhos permitidos
+    credentials: true, // Permitir envio de cookies e credenciais
+    maxAge: 86400, // Cache da resposta pré-flight por 24 horas
   });
 
   app.useGlobalPipes(
